@@ -17,7 +17,7 @@ EOF
 
 `safety check -r requirements.txt --json | tee safety-output.json`
 
-- Sử dụng lệnh `tee` để hiển thị kết quả đầu ra và lưu trữ nó vào một tệp tin cùng một lúc.
+- Sử dụng lệnh `tee` để hiển thị kết quả đầu ra và lưu trữ nó vào file cùng lúc.
 
 - Sử dụng `-r` để chỉ định input file.
 
