@@ -9,3 +9,30 @@ Settings → CI/CD → Variables → Expand
 `ssh root@prod-8t8ba53v`: vào máy ảo
 
 `more /root/.ssh/id_rsa`: private key của máy ảo
+
+Sau khi các biến được lưu trên hệ thống CI thì cần chỉnh sửa lại nội dung file .gitlab-ci.yml và thay thế prod job bằng đoạn mã sau:
+
+```
+prod:
+  stage: deploy
+  image: kroniak/ssh-client:3.6
+  environment: production
+  only:
+      - main
+  before_script:
+   - mkdir -p ~/.ssh
+   - echo "$PROD_SSH_PRIVKEY" > ~/.ssh/id_rsa
+   - chmod 600 ~/.ssh/id_rsa
+   - eval "$(ssh-agent -s)"
+   - ssh-add ~/.ssh/id_rsa
+   - ssh-keyscan -H $PROD_HOSTNAME >> ~/.ssh/known_hosts
+  script:
+   - echo
+   - |
+      ssh $PROD_USERNAME@$PROD_HOSTNAME << EOF
+        docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
+        docker rm -f django.nv
+        docker run -d --name django.nv -p 8000:8000 $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+      EOF
+```
+
