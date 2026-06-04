@@ -6,6 +6,12 @@ Settings → CI/CD → Variables → Expand
 
 <img width="533" height="514" alt="image" src="https://github.com/user-attachments/assets/83a0f19a-abd5-41aa-b95d-48d839ed374b" />
 
+`PROD_USERNAME` - `root`
+
+`PROD_HOSTNAME` - `prod-xxx`
+
+`PROD_SSH_PRIVKEY`
+
 `ssh root@prod-8t8ba53v`: vào máy ảo
 
 `more /root/.ssh/id_rsa`: private key của máy ảo
