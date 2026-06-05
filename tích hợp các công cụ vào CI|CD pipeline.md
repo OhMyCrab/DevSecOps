@@ -146,7 +146,7 @@ build:
 trufflehog:
   stage: build
   script:
-    - docker run --rm -v $(pwd):/src hysnsec/trufflehog git . --json | tee trufflehog-output.json
+    - docker run --rm -v $(pwd):/src hysnsec/trufflehog filesystem /src --json | tee trufflehog-output.json
   artifacts:
     paths: [trufflehog-output.json]
     when: always
