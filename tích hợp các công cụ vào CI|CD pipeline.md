@@ -268,6 +268,7 @@ cinc:
     - mkdir -p ~/.ssh
     - echo "$PROD_SSH_PRIVKEY" | tr -d '\r' > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan -H $PROD_HOSTNAME >> ~/.ssh/known_hosts
     - eval "$(ssh-agent -s)"
     - ssh-add ~/.ssh/id_rsa
     - echo "StrictHostKeyChecking no" >> ~/.ssh/config 
