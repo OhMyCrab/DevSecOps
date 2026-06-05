@@ -10,6 +10,8 @@ Settings → CI/CD → Variables → Expand
 
 `PROD_HOSTNAME` - `prod-xxx`
 
+`PROD_URL` - `prod-8t8ba53v.lab.practical-devsecops.training`
+
 `PROD_SSH_PRIVKEY`
 
 `ssh root@prod-8t8ba53v`: vào máy ảo
