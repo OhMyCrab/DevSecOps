@@ -256,8 +256,6 @@ test:
   stage: test
   script:
     - echo "This is a test step"
-    - exit 1
-  allow_failure: true
 
 cinc:
   stage: preprod
@@ -271,10 +269,10 @@ cinc:
     - chmod 600 ~/.ssh/id_rsa
     - eval "$(ssh-agent -s)"
     - ssh-add ~/.ssh/id_rsa
-    - echo "StrictHostKeyChecking no" >> ~/.ssh/config
+    - echo "StrictHostKeyChecking no" >> ~/.ssh/config 
 
   script:
-    - cinc-auditor exec dev-sec/linux-baseline -t ssh://admin@prod-8t8ba53v.lab.practical-devsecops.training -i ~/.ssh/id_rsa --chef-license accept --reporter json > cinc-results.json || true
+    - cinc-auditor exec https://github.com/dev-sec/linux-baseline.git -t ssh://$PROD_USERNAME@$PROD_HOSTNAME -i ~/.ssh/id_rsa --chef-license accept --reporter json > cinc-results.json || true 
 
   artifacts:
     when: always
