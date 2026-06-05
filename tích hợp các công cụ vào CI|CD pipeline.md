@@ -252,43 +252,11 @@ build:
   artifacts:
     paths: [output.txt]
 
-trufflehog:
-  stage: build
-  script:
-    - docker run --rm -v $(pwd):/src hysnsec/trufflehog git . --json | tee trufflehog-output.json
-  artifacts:
-    paths: [trufflehog-output.json]
-    when: always
-    expire_in: 1 week
-  allow_failure: true
-
-bandit:
-  stage: build
-  script:
-    - docker run --rm --user $(id -u):$(id -g) -v $(pwd):/src hysnsec/bandit -r /src -f json -o /src/bandit-output.json
-  artifacts:
-    paths: [bandit-output.json]
-    when: always
-  allow_failure: true
-
-safety:
+test:
   stage: test
   script:
-    - docker run --rm -v $(pwd):/src hysnsec/safety check -r requirements.txt --json > safety-output.json
-  artifacts:
-    paths: [safety-output.json]
-    when: always
-  allow_failure: true
-
-retirejs:
-  stage: test
-  image: node:alpine3.10
-  script:
-    - npm install -g retire@5.0.0
-    - retire --outputformat json --outputpath retirejs-output.json --severity high
-  artifacts:
-    paths: [retirejs-output.json]
-    when: always
+    - echo "This is a test step"
+    - exit 1
   allow_failure: true
 
 cinc:
@@ -296,18 +264,24 @@ cinc:
   image: ubuntu:22.04
 
   before_script:
-    - apt-get update && apt-get install -y curl openssh-client
-    - curl https://omnitruck.cinc.sh/install.sh | bash -s -- -P cinc-auditor -v 6
+    - apt-get update && apt-get install -y curl openssh-client netcat-openbsd dnsutils
+    - curl -s https://omnitruck.cinc.sh/install.sh | bash -s -- -P cinc-auditor -v 6
     - mkdir -p ~/.ssh
-    - echo "$PROD_SSH_PRIVKEY" > ~/.ssh/id_rsa
+    - echo "$PROD_SSH_PRIVKEY" | tr -d '\r' > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
-    - echo "StrictHostKeyChecking accept-new" >> ~/.ssh/config
+    - eval "$(ssh-agent -s)"
+    - ssh-add ~/.ssh/id_rsa
+    - echo "StrictHostKeyChecking no" >> ~/.ssh/config
 
   script:
-    - cinc-auditor exec https://github.com/dev-sec/linux-baseline.git -t ssh://root@$PROD_URL -i ~/.ssh/id_rsa --chef-license accept --reporter json > cinc-results.json
+    - echo "Target $PROD_URL"
+    - nslookup $PROD_URL || true
+    - nc -zv $PROD_URL 22 || true
+    - cinc-auditor exec https://github.com/dev-sec/linux-baseline.git -t ssh://root@$PROD_URL --chef-license accept --reporter json > cinc-results.json || true
+
   artifacts:
-    paths: [cinc-results.json]
     when: always
+    paths: [cinc-results.json]
   allow_failure: true
 
 integration:
@@ -315,42 +289,6 @@ integration:
   script:
     - echo "This is an integration step"
     - exit 1
-  allow_failure: true
-
-nmap:
-  stage: integration
-  script:
-    - docker run --rm -v $(pwd):/tmp hysnsec/nmap $PROD_URL -oX /tmp/nmap-output.xml
-  artifacts:
-    paths: [nmap-output.xml]
-    when: always
-  allow_failure: true
-
-nikto:
-  stage: integration
-  script:
-    - docker run --rm -v $(pwd):/tmp hysnsec/nikto -h $PROD_URL -o /tmp/nikto-output.xml
-  artifacts:
-    paths: [nikto-output.xml]
-    when: always
-  allow_failure: true
-
-sslyze:
-  stage: integration
-  script:
-    - docker run --rm -v $(pwd):/tmp hysnsec/sslyze $PROD_URL:443 --json_out /tmp/sslyze-output.json
-  artifacts:
-    paths: [sslyze-output.json]
-    when: always
-  allow_failure: true
-
-zap:
-  stage: integration
-  script:
-    - docker run --rm --user $(id -u):$(id -g) -w /zap -v $(pwd):/zap/wrk:rw hysnsec/zap:2.16.1 zap-baseline.py -t https://$PROD_URL -J zap-output.json
-  artifacts:
-    paths: [zap-output.json]
-    when: always
   allow_failure: true
 
 prod:
