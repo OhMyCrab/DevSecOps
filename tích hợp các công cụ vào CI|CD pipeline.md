@@ -123,6 +123,102 @@ zap-baseline:
   allow_failure: true  # Optional
 ```
 
+** Ví dụ về challenge 1 trong thi thử
+
+```
+default:
+  image: docker:20.10
+  services:
+    - docker:dind
+
+variables:
+  DOCKER_DRIVER: overlay2
+  PROD_URL: "prod-8t8ba53v.lab.practical-devsecops.training"
+
+stages:
+  - build
+  - test
+  - integration
+
+# --- SAST ---
+git-secrets:
+  stage: build
+  script:
+    - docker run --rm -v $(pwd):/src hysnsec/trufflehog git . --json | tee trufflehog-output.json
+  artifacts:
+    paths: [trufflehog-output.json]
+    when: always
+    expire_in: 1 week
+  allow_failure: true
+
+bandit:
+  stage: build
+  script:
+    - docker run --rm --user $(id -u):$(id -g) -v $(pwd):/src hysnsec/bandit -r /src -f json -o /src/bandit-output.json
+  artifacts:
+    paths: [bandit-output.json]
+    when: always
+  allow_failure: true
+
+# --- SCA ---
+safety:
+  stage: test
+  script:
+    - docker run --rm -v $(pwd):/src hysnsec/safety check -r requirements.txt --json > safety-output.json
+  artifacts:
+    paths: [safety-output.json]
+    when: always
+  allow_failure: true
+
+retirejs:
+  stage: test
+  image: node:alpine3.10
+  script:
+    - npm install -g retire@5.0.0
+    - retire --outputformat json --outputpath retirejs-output.json --severity high
+  artifacts:
+    paths: [retirejs-output.json]
+    when: always
+  allow_failure: true
+
+# --- DAST / INTEGRATION ---
+nmap:
+  stage: integration
+  script:
+    - docker run --rm -v $(pwd):/tmp hysnsec/nmap $PROD_URL -oX /tmp/nmap-output.xml
+  artifacts:
+    paths: [nmap-output.xml]
+    when: always
+  allow_failure: true
+
+nikto:
+  stage: integration
+  script:
+    - docker run --rm -v $(pwd):/tmp hysnsec/nikto -h $PROD_URL -o /tmp/nikto-output.xml
+  artifacts:
+    paths: [nikto-output.xml]
+    when: always
+  allow_failure: true
+
+sslscan:
+  stage: integration
+  script:
+    - docker run --rm -v $(pwd):/tmp hysnsec/sslyze $PROD_URL:443 --json_out /tmp/sslyze-output.json
+  artifacts:
+    paths: [sslyze-output.json]
+    when: always
+  allow_failure: true
+
+zap-baseline:
+  stage: integration
+  script:
+    - docker run --rm --user $(id -u):$(id -g) -w /zap -v $(pwd):/zap/wrk:rw hysnsec/zap:2.16.1 zap-baseline.py -t https://$PROD_URL -J zap-output.json
+  artifacts:
+    paths: [zap-output.json]
+    when: always
+  allow_failure: true
+```
+
 ```
 default:
   image: docker:20.10
