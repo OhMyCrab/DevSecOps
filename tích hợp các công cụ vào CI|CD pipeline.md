@@ -1,9 +1,30 @@
 SCA
 
-`Safety` - được tích hợp vào GitLab CI/CD bằng python
+`Safety`
+
+test local
 
 ```
-oast:
+git clone https://gitlab.practical-devsecops.training/pdso/django.nv webapp
+
+cd webapp
+
+apt-get update && apt-get install -y build-essential python3-dev # nếu tải safety lỗi thì dùng
+
+pip3 install safety==2.3.5 # lệnh tải Safety
+
+cat > .safety-policy.yml <<EOF
+security:
+  ignore-vulnerabilities: {}
+EOF
+
+safety check -r requirements.txt --json | tee safety-output.json # lệnh chạy Safety
+```
+
+tích hợp vào pipeline
+
+```
+safety:
   stage: test
   script:
     - docker pull hysnsec/safety
@@ -21,8 +42,31 @@ oast:
 
 `RetireJS` - 
 
+test local
+
 ```
-oast-frontend:
+git clone https://gitlab.practical-devsecops.training/pdso/django.nv webapp
+
+cd webapp
+
+# tải Node JS và NPM
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+NODE_MAJOR=20
+echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+apt update
+
+apt install nodejs -y
+
+npm install -g retire@5.0.0 # lệnh tải RetireJS
+
+retire --severity critical --outputformat json --outputpath retire_output.json # lệnh chạy RetireJS
+```
+
+tích hợp vào pipeline
+
+```
+retirejs:
   stage: test
   image: node:alpine3.10
   script:
@@ -33,10 +77,41 @@ oast-frontend:
 
 SAST
 
-`TruffleHog` - được tích hợp vào GitLab CI/CD bằng Docker
+`TruffleHog`
+
+test local
 
 ```
-git-secrets:
+# tải TruffleHog
+wget https://github.com/trufflesecurity/trufflehog/releases/download/v3.79.0/trufflehog_3.79.0_linux_amd64.tar.gz
+tar -xvf trufflehog_3.79.0_linux_amd64.tar.gz
+chmod +x trufflehog
+mv trufflehog /usr/local/bin/
+
+trufflehog git http://gitlab-ce-8t8ba53v.lab.practical-devsecops.training/root/django-nv.git --json # lệnh chạy TruffleHog quét dự án django.nv
+```
+
+```
+eval "$(ssh-agent -s)"
+chmod 600 ~/.ssh/id_rsa
+
+ssh-add ~/.ssh/id_rsa
+
+cat << EOF > ~/.ssh/config
+Host gitlab-ce-8t8ba53v
+    HostName gitlab-ce-8t8ba53v
+    User git
+    IdentityFile ~/.ssh/id_rsa
+    IdentitiesOnly yes
+EOF
+
+trufflehog git git@gitlab-ce-8t8ba53v:root/django-nv.git --json | tee secret.json # lệnh chạy TruffleHog dùng ssh để quét git repo
+```
+
+tích hợp vào pipeline
+
+```
+trufflehog:
   stage: build
   script:
     - docker run -v $(pwd):/src --rm hysnsec/trufflehog git http://gitlab-ce-8t8ba53v.lab.practical-devsecops.training/root/django-nv.git --fail --json | tee trufflehog-output.json
@@ -48,6 +123,20 @@ git-secrets:
 ```
 
 `Bandit`
+
+test local
+
+```
+git clone https://gitlab.practical-devsecops.training/pdso/django.nv webapp
+
+cd webapp
+
+pip3 install bandit==1.8.5 # lệnh tải bandit
+
+bandit -r . -f json | tee bandit-output.json # lệnh chạy bandit
+```
+
+tích hợp vào pipeline
 
 ```
 sast:
@@ -66,6 +155,21 @@ DAST
 
 `nikto`
 
+test local
+
+```
+apt install -y libnet-ssleay-perl # lệnh cần thiết để hỗ trợ quét SSL trong Nikto.
+
+git clone https://github.com/sullo/nikto # lệnh tải nikto
+
+cd nikto/program
+git checkout tags/2.1.6
+
+./nikto.pl -h prod-8t8ba53v -output nikto_output.xml # lệnh chạy nikto
+```
+
+tích hợp vào pipeline
+
 ```
 nikto:
   stage: test
@@ -80,8 +184,18 @@ nikto:
 
 `sslyze`
 
+test local
+
 ```
-sslscan:
+pip3 install sslyze==6.0.0 # lệnh tải sslyze
+
+sslyze --json_out sslyze-output.json prod-8t8ba53v.lab.practical-devsecops.training:443 # lệnh chạy sslyze
+```
+
+tích hợp vào pipeline
+
+```
+sslyze:
   stage: test
   script:
     - docker pull hysnsec/sslyze
@@ -93,6 +207,16 @@ sslscan:
 ```
 
 `nmap`
+
+test local
+
+```
+apt-get update && apt-get install nmap -y  # lệnh tải nmap
+
+nmap prod-8t8ba53v -oX nmap_out.xml # lệnh chạy nmap
+```
+
+tích hợp vào pipeline
 
 ```
 nmap:
@@ -107,6 +231,16 @@ nmap:
 ```
 
 `zap`
+
+test local
+
+```
+docker run --rm hysnsec/zap:2.16.1 zap-baseline.py -t https://prod-8t8ba53v.lab.practical-devsecops.training # lệnh tải zap
+
+docker run --user $(id -u):$(id -g) -w /zap -v $(pwd):/zap/wrk:rw --rm hysnsec/zap:2.16.1 zap-baseline.py -t https://prod-8t8ba53v.lab.practical-devsecops.training -J zap-output.json # lệnh chạy zap
+```
+
+tích hợp vào pipeline
 
 ```
 zap-baseline:
@@ -123,6 +257,198 @@ zap-baseline:
   allow_failure: true  # Optional
 ```
 
+IaC
+
+`ansible`
+
+test local
+
+```
+pip3 install ansible==9.13.0
+
+cat > inventory.ini <<EOL
+
+# DevSecOps Studio Inventory
+[devsecops]
+devsecops-box-8t8ba53v
+
+[gitservers]
+gitlab-ce-8t8ba53v
+
+[prod]
+prod-8t8ba53v
+EOL
+
+ssh-keyscan -H prod-8t8ba53v gitlab-ce-8t8ba53v devsecops-box-8t8ba53v >> ~/.ssh/known_hosts
+
+ansible-galaxy install dev-sec.os-hardening
+
+cat > ansible-hardening.yml <<EOL
+---
+- name: Playbook to harden Ubuntu OS.
+  hosts: prod
+  remote_user: root
+  become: yes
+
+  vars:
+    # Exclude sysctl parameters that cannot be changed at runtime in newer Ubuntu
+    # The role will skip these parameters when they're in the ignore list
+    os_hardening_sysctl_ignore:
+      - kernel.randomize_va_space
+      - kernel.core_uses_pid
+      - vm.mmap_rnd_bits
+      - vm.mmap_rnd_compat_bits
+      - kernel.kexec_load_disabled
+      - fs.suid_dumpable
+
+  roles:
+    - role: dev-sec.os-hardening
+      # Allow role to continue even if some sysctl parameters fail
+      # (they are read-only in newer Ubuntu versions)
+      ignore_errors: yes
+
+EOL
+
+ansible-playbook -i inventory.ini ansible-hardening.yml
+
+```
+
+tích hợp vào pipeline
+
+```
+ansible-hardening:
+  stage: prod
+  image: willhallonline/ansible:2.16-ubuntu-22.04
+  before_script:
+    - mkdir -p ~/.ssh
+    - echo "$DEPLOYMENT_SERVER_SSH_PRIVKEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - eval "$(ssh-agent -s)"
+    - ssh-add ~/.ssh/id_rsa
+    - ssh-keyscan -H $DEPLOYMENT_SERVER >> ~/.ssh/known_hosts
+  script:
+    - echo -e "[prod]\n$DEPLOYMENT_SERVER" >> inventory.ini
+    - ansible-galaxy install dev-sec.os-hardening
+    - ansible-playbook -i inventory.ini ansible-hardening.yml
+```
+
+```
+---
+- name: Playbook to harden Ubuntu OS.
+  hosts: prod
+  remote_user: root
+  become: yes
+
+  vars:
+    # Exclude sysctl parameters that cannot be changed at runtime in newer Ubuntu
+    # The role will skip these parameters when they're in the ignore list
+    os_hardening_sysctl_ignore:
+      - kernel.randomize_va_space
+      - kernel.core_uses_pid
+      - vm.mmap_rnd_bits
+      - vm.mmap_rnd_compat_bits
+      - kernel.kexec_load_disabled
+      - fs.suid_dumpable
+
+  roles:
+    - role: dev-sec.os-hardening
+      # Allow role to continue even if some sysctl parameters fail
+      # (they are read-only in newer Ubuntu versions)
+      ignore_errors: yes
+```
+
+CaC
+
+`CinC audit`
+
+test local
+
+```
+wget https://omnitruck.cinc.sh/install.sh
+
+bash install.sh -P cinc-auditor -v 6
+
+echo "StrictHostKeyChecking accept-new" >> ~/.ssh/config
+
+cinc-auditor exec https://github.com/dev-sec/linux-baseline.git -t ssh://root@prod-8t8ba53v -i ~/.ssh/id_rsa --chef-license accept
+```
+
+tích hợp vào pipeline
+
+```
+cinc-auditor:
+  stage: prod
+  before_script:
+    - mkdir -p ~/.ssh
+    - echo "$DEPLOYMENT_SERVER_SSH_PRIVKEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - eval "$(ssh-agent -s)"
+    - ssh-add ~/.ssh/id_rsa
+    - ssh-keyscan -H $DEPLOYMENT_SERVER >> ~/.ssh/known_hosts
+  script:
+    - docker run --rm -v ~/.ssh:/root/.ssh -v $(pwd):/share cincproject/auditor:6.8.24 exec https://github.com/dev-sec/linux-baseline.git -t ssh://root@$DEPLOYMENT_SERVER -i ~/.ssh/id_rsa --chef-license accept
+```
+
+tạo CinC audit profile tùy chỉnh
+
+```
+mkdir cinc-profiles && cd cinc-profiles
+
+cinc-auditor init profile ubuntu --chef-license accept
+
+cat > ubuntu/controls/example.rb <<EOL
+control 'shadow-1' do
+  title 'Ensure /etc/shadow file is properly secured'
+  desc 'The /etc/shadow file contains password hashes and should be protected'
+
+  describe file('/etc/shadow') do
+    it { should exist }
+    it { should be_file }
+    it { should be_owned_by 'root' }
+  end
+end
+EOL
+
+cinc-auditor check ubuntu
+
+cinc-auditor exec ubuntu
+
+echo "StrictHostKeyChecking accept-new" >> ~/.ssh/config
+
+cinc-auditor exec ubuntu -t ssh://root@prod-8t8ba53v -i ~/.ssh/id_rsa --chef-license accept
+```
+
+Vul Management
+
+`defect dojo`
+
+test local
+
+```
+git clone https://gitlab.practical-devsecops.training/pdso/rails.git webapp
+
+cd webapp
+
+docker run --rm -v $(pwd):/src hysnsec/brakeman -f json /src
+
+docker run --rm -v $(pwd):/src hysnsec/brakeman -f json /src | tee brakeman-result.json
+
+curl https://gitlab.practical-devsecops.training/-/snippets/28/raw -o upload-results.py
+
+pip3 install requests
+
+export API_KEY=$(curl -s -XPOST -H 'content-type: application/json' https://dojo-8t8ba53v.lab.practical-devsecops.training/api/v2/api-token-auth/ -d '{"username": "root", "password": "pdso-training"}' | jq -r '.token' )
+
+python3 upload-results.py --host dojo-8t8ba53v.lab.practical-devsecops.training --api_key $API_KEY --engagement_id 2 --product_id 3 --lead_id 1 --environment "Production" --result_file brakeman-result.json --scanner "Brakeman Scan"
+
+bandit -r . -f json | tee bandit-output.json
+```
+
+tích hợp vào pipeline
+
+```
+
+```
 ** Ví dụ về challenge 1 trong thi thử
 
 ```
