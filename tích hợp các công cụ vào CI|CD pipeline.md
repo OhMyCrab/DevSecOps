@@ -447,7 +447,7 @@ bandit -r . -f json | tee bandit-output.json
 tích hợp vào pipeline
 
 ```
-
+curl https://gitlab.practical-devsecops.training/-/snippets/28/raw -o upload-results.py
 ```
 ** Ví dụ về challenge 1 trong thi thử
 
