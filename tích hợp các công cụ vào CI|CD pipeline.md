@@ -274,14 +274,13 @@ cinc:
     - echo "StrictHostKeyChecking no" >> ~/.ssh/config
 
   script:
-    - echo "Target $PROD_URL"
-    - nslookup $PROD_URL || true
-    - nc -zv $PROD_URL 22 || true
-    - cinc-auditor exec https://github.com/dev-sec/linux-baseline.git -t ssh://root@$PROD_URL --chef-license accept --reporter json > cinc-results.json || true
+    - cinc-auditor exec dev-sec/linux-baseline \ -t ssh://admin@prod-8t8ba53v.lab.practical-devsecops.training \ -i ~/.ssh/id_rsa \ --chef-license accept \ --reporter json > cinc-results.json || true
 
   artifacts:
     when: always
-    paths: [cinc-results.json]
+    paths:
+      - cinc-results.json
+
   allow_failure: true
 
 integration:
