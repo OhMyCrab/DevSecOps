@@ -262,6 +262,7 @@ cinc:
   image: ubuntu:22.04
 
   before_script:
+    - apt-get update && apt-get install -y git
     - apt-get update && apt-get install -y curl openssh-client netcat-openbsd dnsutils
     - curl -s https://omnitruck.cinc.sh/install.sh | bash -s -- -P cinc-auditor -v 6
     - mkdir -p ~/.ssh
@@ -272,7 +273,7 @@ cinc:
     - echo "StrictHostKeyChecking no" >> ~/.ssh/config 
 
   script:
-    - cinc-auditor exec https://github.com/dev-sec/linux-baseline.git -t ssh://$PROD_USERNAME@$PROD_HOSTNAME -i ~/.ssh/id_rsa --chef-license accept --reporter json > cinc-results.json || true 
+    - cinc-auditor exec https://github.com/dev-sec/linux-baseline.git -t ssh://$PROD_USERNAME@$PROD_HOSTNAME -i ~/.ssh/id_rsa --chef-license accept --reporter json > cinc-results.json
 
   artifacts:
     when: always
