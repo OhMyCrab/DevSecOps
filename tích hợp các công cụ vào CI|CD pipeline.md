@@ -122,3 +122,152 @@ zap-baseline:
     when: always        # What does this do?
   allow_failure: true  # Optional
 ```
+
+```
+default:
+  image: docker:20.10
+  services:
+    - docker:dind
+
+stages:
+  - build
+  - test
+  - deploy
+  - integration
+
+# --- BUILD STAGE ---
+build:
+  stage: build
+  before_script:
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+  script:
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+
+git-secrets:
+  stage: build
+  script:
+    - docker run --rm -v $(pwd):/src hysnsec/trufflehog git $CI_REPOSITORY_URL --fail --json | tee trufflehog-output.json
+  artifacts:
+    paths:
+      - trufflehog-output.json
+    when: always
+    expire_in: 1 week
+  allow_failure: true
+
+sast:
+  stage: build
+  script:
+    - docker pull hysnsec/bandit
+    - docker run --user $(id -u):$(id -g) -v $(pwd):/src --rm hysnsec/bandit -r /src -f json -o /src/bandit-output.json
+  artifacts:
+    paths:
+      - bandit-output.json
+    when: always
+  allow_failure: true
+
+# --- TEST STAGE ---
+oast:
+  stage: test
+  script:
+    - docker pull hysnsec/safety
+    - |
+      cat > .safety-policy.yml <<EOF
+      security:
+        ignore-vulnerabilities: {}
+      EOF
+    - docker run --rm -v $(pwd):/src hysnsec/safety check -r requirements.txt --json > oast-results.json
+  artifacts:
+    paths:
+      - oast-results.json
+    when: always
+  allow_failure: true
+
+oast-frontend:
+  stage: test
+  image: node:alpine3.10
+  script:
+    - npm install
+    - npm install -g retire@5.0.0
+    - retire --outputformat json --outputpath retirejs-report.json --severity high
+  artifacts:
+    paths:
+      - retirejs-report.json
+    when: always
+  allow_failure: true
+
+# --- DEPLOY STAGE ---
+prod:
+  stage: deploy
+  image: kroniak/ssh-client:3.6
+  environment: production
+  needs: ["build"]
+  only:
+    - main
+  before_script:
+    - mkdir -p ~/.ssh
+    - echo "$PROD_SSH_PRIVKEY" > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - eval "$(ssh-agent -s)"
+    - ssh-add ~/.ssh/id_rsa
+    - ssh-keyscan -H $PROD_HOSTNAME >> ~/.ssh/known_hosts
+  script:
+    - |
+      ssh $PROD_USERNAME@$PROD_HOSTNAME << EOF
+      docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+      docker rm -f django.nv || true
+      docker run -d --name django.nv -p 8000:8000 $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+      EOF
+
+# --- INTEGRATION STAGE ---
+nmap:
+  stage: integration
+  needs: ["prod"]
+  script:
+    - docker pull hysnsec/nmap
+    - docker run --rm -v $(pwd):/tmp hysnsec/nmap $PROD_HOSTNAME -oX /tmp/nmap-output.xml
+  artifacts:
+    paths:
+      - nmap-output.xml
+    when: always
+  allow_failure: true
+
+nikto:
+  stage: integration
+  needs: ["prod"]
+  script:
+    - docker pull hysnsec/nikto
+    - docker run --rm -v $(pwd):/tmp hysnsec/nikto -h $PROD_HOSTNAME -o /tmp/nikto-output.xml
+  artifacts:
+    paths:
+      - nikto-output.xml
+    when: always
+  allow_failure: true
+
+sslscan:
+  stage: integration
+  needs: ["prod"]
+  script:
+    - docker pull hysnsec/sslyze
+    - docker run --rm -v $(pwd):/tmp hysnsec/sslyze ${PROD_HOSTNAME}:443 --json_out /tmp/sslyze-output.json
+  artifacts:
+    paths:
+      - sslyze-output.json
+    when: always
+  allow_failure: true
+
+zap-baseline:
+  stage: integration
+  needs: ["prod"]
+  before_script:
+    - docker pull hysnsec/zap:2.16.1
+  script:
+    - docker run --user $(id -u):$(id -g) -w /zap -v $(pwd):/zap/wrk:rw --rm hysnsec/zap:2.16.1 zap-baseline.py -t https://$PROD_HOSTNAME.lab.practical-devsecops.training -J zap-output.json
+  after_script:
+    - docker rmi hysnsec/zap:2.16.1
+  artifacts:
+    paths:
+      - zap-output.json
+    when: always
+  allow_failure: true
+```
