@@ -40,7 +40,7 @@ safety:
   allow_failure: true
 ```
 
-`RetireJS` - 
+`RetireJS`
 
 test local
 
