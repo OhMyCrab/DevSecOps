@@ -449,6 +449,20 @@ tích hợp vào pipeline
 ```
 curl https://gitlab.practical-devsecops.training/-/snippets/28/raw -o upload-results.py
 ```
+
+```
+upload_to_dojo:
+  stage: upload
+  image: python:3.9
+  script:
+    - pip install requests
+    - curl -s https://gitlab.practical-devsecops.training/-/snippets/28/raw -o upload-results.py
+    # Lấy token (nên lưu $DOJO_USER và $DOJO_PASS trong CI/CD Settings)
+    - export API_KEY=$(curl -s -XPOST -H 'content-type: application/json' $DEFECTDOJO_URL/api/v2/api-token-auth/ -d "{\"username\": \"$DOJO_USER\", \"password\": \"$DOJO_PASS\"}" | jq -r '.token')
+    # Upload kết quả
+    - python3 upload-results.py --host $DEFECTDOJO_URL --api_key $API_KEY --engagement_id $ENGAGEMENT_ID --product_id $PRODUCT_ID --lead_id 1 --environment "Production" --result_file brakeman-result.json --scanner "Brakeman Scan"
+    - python3 upload-results.py --host $DEFECTDOJO_URL --api_key $API_KEY --engagement_id $ENGAGEMENT_ID --product_id $PRODUCT_ID --lead_id 1 --environment "Production" --result_file bandit-output.json --scanner "Bandit Scan"
+```
 ** Ví dụ về challenge 1 trong thi thử
 
 ```
