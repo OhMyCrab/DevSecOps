@@ -439,6 +439,8 @@ pip3 install requests
 
 export API_KEY=$(curl -s -XPOST -H 'content-type: application/json' https://dojo-8t8ba53v.lab.practical-devsecops.training/api/v2/api-token-auth/ -d '{"username": "root", "password": "pdso-training"}' | jq -r '.token' )
 
+echo $API_KEY # hiển thị API_KEY_DOJO
+
 python3 upload-results.py --host dojo-8t8ba53v.lab.practical-devsecops.training --api_key $API_KEY --engagement_id 2 --product_id 3 --lead_id 1 --environment "Production" --result_file brakeman-result.json --scanner "Brakeman Scan"
 
 bandit -r . -f json | tee bandit-output.json
@@ -457,11 +459,8 @@ upload_to_dojo:
   script:
     - pip install requests
     - curl -s https://gitlab.practical-devsecops.training/-/snippets/28/raw -o upload-results.py
-    # Lấy token (nên lưu $DOJO_USER và $DOJO_PASS trong CI/CD Settings)
-    - export API_KEY=$(curl -s -XPOST -H 'content-type: application/json' $DEFECTDOJO_URL/api/v2/api-token-auth/ -d "{\"username\": \"$DOJO_USER\", \"password\": \"$DOJO_PASS\"}" | jq -r '.token')
-    # Upload kết quả
-    - python3 upload-results.py --host $DEFECTDOJO_URL --api_key $API_KEY --engagement_id $ENGAGEMENT_ID --product_id $PRODUCT_ID --lead_id 1 --environment "Production" --result_file brakeman-result.json --scanner "Brakeman Scan"
-    - python3 upload-results.py --host $DEFECTDOJO_URL --api_key $API_KEY --engagement_id $ENGAGEMENT_ID --product_id $PRODUCT_ID --lead_id 1 --environment "Production" --result_file bandit-output.json --scanner "Bandit Scan"
+    - python3 upload-results.py --host $DEFECTDOJO_URL --api_key $API_KEY_DOJO --engagement_id $ENGAGEMENT_ID --product_id $PRODUCT_ID --lead_id 1 --environment "Production" --result_file brakeman-result.json --scanner "Brakeman Scan"
+    - python3 upload-results.py --host $DEFECTDOJO_URL --api_key $API_KEY_DOJO --engagement_id $ENGAGEMENT_ID --product_id $PRODUCT_ID --lead_id 1 --environment "Production" --result_file bandit-output.json --scanner "Bandit Scan"
 ```
 ** Ví dụ về challenge 1 trong thi thử
 
