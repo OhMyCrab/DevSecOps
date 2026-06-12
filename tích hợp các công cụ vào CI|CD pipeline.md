@@ -291,8 +291,6 @@ cat > ansible-hardening.yml <<EOL
   become: yes
 
   vars:
-    # Exclude sysctl parameters that cannot be changed at runtime in newer Ubuntu
-    # The role will skip these parameters when they're in the ignore list
     os_hardening_sysctl_ignore:
       - kernel.randomize_va_space
       - kernel.core_uses_pid
@@ -303,8 +301,6 @@ cat > ansible-hardening.yml <<EOL
 
   roles:
     - role: dev-sec.os-hardening
-      # Allow role to continue even if some sysctl parameters fail
-      # (they are read-only in newer Ubuntu versions)
       ignore_errors: yes
 
 EOL
